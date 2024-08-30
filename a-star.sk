@@ -1,0 +1,80 @@
+on load:
+    set {-moves::*} to vector(1, 0, 0), vector(-1, 0, 0), vector(0, 1, 0), vector(0, -1, 0), vector(0, 0, 1) and vector(0, 0, -1)
+
+function constructPath(start: location, goal: location) :: locations:
+    set {_gscore::%{_start}%} to 0
+    set {_fscore::%{_start}%} to predictShortest({_start}, {_goal})
+
+    set {_open::%{_fscore::%{_start}%}%::%{_start}%} to {_start}
+
+    while indices of {_open::*} is set:
+        if loop-counter > 10000:
+            broadcast "&c&l[!] Reached 10k iterations: Terminating!"
+            stop
+
+        set {_index} to 1st element of (indices of {_open::*})
+        set {_current} to 1st element of {_open::%{_index}%::*}
+
+        if {_current} = {_goal}:
+            set {_path::0} to {_current}
+            while {_cameFrom::%{_current}%} is set:
+                set {_current} to {_cameFrom::%{_current}%}
+                set {_path::%0-(loop-counter-2)%} to {_current}
+            return {_path::*}
+        
+        delete {_open::%{_index}%::%{_current}%}
+        if {_open::%{_index}%::*} is not set:
+            delete {_open::%{_index}%::*}
+
+        loop neighboursOf({_current}):
+            set {_neighbour} to loop-value
+            continue if isValidNode({_neighbour}) != true
+
+            set {_gscore} to {_gscore::%{_current}%} + (distance between {_current} and {_neighbour})
+            if {_gscore} < ({_gscore::%{_neighbour}%} ? infinity value):
+                set {_previousScore} to {_fscore::%{_neighbour}%}
+
+                set {_cameFrom::%{_neighbour}%} to {_current}
+                set {_gscore::%{_neighbour}%} to {_gscore}
+                set {_fscore::%{_neighbour}%} to {_gscore} + predictShortest({_neighbour}, {_goal})
+                
+                delete {_open::%{_previousScore}%::%{_neighbour}%}
+                if {_open::%{_previousScore}%::*} is not set:
+                    delete {_open::%{_previousScore}%::*}
+                set {_open::%{_fscore::%{_neighbour}%}%::%{_neighbour}%} to {_neighbour}
+
+
+function isValidNode(node: location) :: boolean:
+    return whether (block at {_node}) is not solid
+
+function neighboursOf(current: location) :: locations:
+    loop {-moves::*}:
+        set {_neighbour::%loop-counter%} to {_current} ~ loop-value
+    return {_neighbour::*}
+
+function predictShortest(current: location, goal: location) :: number:
+    return distance between {_current} and {_goal}
+
+
+command /testastar:
+    trigger:
+        set {_startTime} to unix timestamp of now * 1000
+        set {-path::*} to constructPath({-a}, {-b})
+        set {_endTime} to unix timestamp of now * 1000
+        broadcast "Took: %{_endTime} - {_startTime}%ms"
+        set blocks at {-path::*} to black concrete
+
+command /undo:
+    trigger:
+        set blocks at {-path::*} to air
+
+
+command /seta:
+    trigger:
+        set {-a} to location of block at player
+        send "Set a"
+
+command /setb:
+    trigger:
+        set {-b} to location of block at player
+        send "Set b"
